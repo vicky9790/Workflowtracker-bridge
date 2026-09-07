@@ -1,0 +1,318 @@
+{
+  "info": {
+    "name": "Bridge Backend",
+    "description": "Multi-tenant bridge between the TrackFlow Electron Agent and each organization's own Zoho Creator account.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "adminToken", "value": "" },
+    { "key": "deviceToken", "value": "" },
+    { "key": "organizationCode", "value": "" },
+    { "key": "organizationId", "value": "" },
+    { "key": "employeeId", "value": "EMP-001" },
+    { "key": "deviceId", "value": "DEVICE-ABC-001" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        { "name": "GET /health", "request": { "method": "GET", "url": "{{baseUrl}}/health" } }
+      ]
+    },
+    {
+      "name": "Organizations",
+      "item": [
+        {
+          "name": "Register organization",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const body = pm.response.json();",
+            "if (body.success) {",
+            "  pm.collectionVariables.set('adminToken', body.data.token);",
+            "  pm.collectionVariables.set('organizationCode', body.data.organization.organizationCode);",
+            "  pm.collectionVariables.set('organizationId', body.data.organization.id);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/organizations/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationName\": \"Acme Workforce\",\n  \"email\": \"admin@acme.example\",\n  \"password\": \"a-strong-password\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const body = pm.response.json();",
+            "if (body.success) { pm.collectionVariables.set('adminToken', body.data.token); }"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/organizations/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@acme.example\",\n  \"password\": \"a-strong-password\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Zoho",
+      "item": [
+        {
+          "name": "Connect (get authorization URL)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/zoho/connect?account_owner_name=your-zoho-owner&app_link_name=workforce-activity-intelligence",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "zoho", "connect"],
+              "query": [
+                { "key": "account_owner_name", "value": "your-zoho-owner" },
+                { "key": "app_link_name", "value": "workforce-activity-intelligence" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Callback (Zoho redirects here - for reference only)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/zoho/callback?code=FROM_ZOHO_REDIRECT&state=FROM_ZOHO_REDIRECT"
+          }
+        },
+        {
+          "name": "Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/zoho/status"
+          }
+        },
+        {
+          "name": "Disconnect",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/zoho/disconnect"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Employees",
+      "item": [
+        {
+          "name": "Create employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/employees",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeCode\": \"{{employeeId}}\",\n  \"fullName\": \"Vignesh\",\n  \"email\": \"vignesh@acme.example\",\n  \"department\": \"IT\",\n  \"designation\": \"Developer\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List employees",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/employees?skip=0&take=50"
+          }
+        },
+        {
+          "name": "Get employee by id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/employees/:id",
+            "variable": [{ "key": "id", "value": "REPLACE_WITH_EMPLOYEE_ID" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Agent - Enrollment",
+      "item": [
+        {
+          "name": "Enroll device",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const body = pm.response.json();",
+            "if (body.success) { pm.collectionVariables.set('deviceToken', body.data.device_token); }"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/agent/enroll",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organization_code\": \"{{organizationCode}}\",\n  \"employee_id\": \"{{employeeId}}\",\n  \"device_id\": \"{{deviceId}}\",\n  \"hostname\": \"vignesh-macbook\",\n  \"os\": \"darwin\",\n  \"os_version\": \"15.6\",\n  \"arch\": \"arm64\",\n  \"agent_version\": \"1.0.0\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get device info",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }],
+            "url": "{{baseUrl}}/api/agent/device"
+          }
+        },
+        {
+          "name": "Heartbeat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{deviceToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/agent/heartbeat",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"ONLINE\",\n  \"agent_version\": \"1.0.0\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Agent - Activity",
+      "item": [
+        {
+          "name": "Work session (START)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{deviceToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/agent/work-session",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"sess-{{$timestamp}}\",\n  \"action\": \"START\",\n  \"login_time\": \"2026-01-01T09:00:00+05:30\",\n  \"session_status\": \"ACTIVE\",\n  \"session_date\": \"2026-01-01\",\n  \"event_id\": \"evt-{{$guid}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Browser activity (OPEN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{deviceToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/agent/browser-activity",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"browser\": \"Chrome\",\n  \"domain\": \"github.com\",\n  \"url\": \"https://github.com\",\n  \"page_title\": \"GitHub\",\n  \"start_time\": \"2026-01-01T09:05:00+05:30\",\n  \"action\": \"OPEN\",\n  \"event_id\": \"{{$guid}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Application usage",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{deviceToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/agent/application-usage",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"application_name\": \"Visual Studio Code\",\n  \"start_time\": \"2026-01-01T09:00:00+05:30\",\n  \"end_time\": \"2026-01-01T09:30:00+05:30\",\n  \"duration_seconds\": 1800,\n  \"event_id\": \"{{$guid}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Keyboard metrics",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{deviceToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/agent/keyboard-metrics",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keystroke_count\": 512,\n  \"active_duration\": 900,\n  \"timestamp\": \"2026-01-01T09:30:00+05:30\",\n  \"event_id\": \"{{$guid}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Mouse metrics",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{deviceToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/agent/mouse-metrics",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"click_count\": 231,\n  \"movement_events\": 2039,\n  \"scroll_events\": 4340,\n  \"active_duration\": 673,\n  \"timestamp\": \"2026-01-01T09:30:00+05:30\",\n  \"event_id\": \"{{$guid}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Screenshot",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{deviceToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/agent/screenshot",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timestamp\": \"2026-01-01T09:30:00+05:30\",\n  \"screenshot_file\": \"base64-or-reference-string\",\n  \"capture_reason\": \"TIMER\",\n  \"privacy_status\": \"PUBLIC\",\n  \"event_id\": \"{{$guid}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Activity batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{deviceToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/agent/activity/batch",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    { \"type\": \"mouse\", \"event_id\": \"{{$guid}}\", \"data\": { \"click_count\": 5, \"active_duration\": 30, \"timestamp\": \"2026-01-01T09:31:00+05:30\" } },\n    { \"type\": \"keyboard\", \"event_id\": \"{{$guid}}\", \"data\": { \"keystroke_count\": 40, \"active_duration\": 30, \"timestamp\": \"2026-01-01T09:31:00+05:30\" } }\n  ]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync",
+      "item": [
+        {
+          "name": "Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/sync/status"
+          }
+        },
+        {
+          "name": "Trigger sync now",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/sync/{{organizationId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

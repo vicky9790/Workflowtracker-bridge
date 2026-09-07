@@ -1,0 +1,369 @@
+// Bridge Backend - Prisma schema
+//
+// Tenant isolation rule enforced throughout this schema: every table that
+// holds tenant data carries an organization_id, and every relation to a
+// parent that itself belongs to an organization is additionally indexed by
+// organization_id so queries never have to "join up" to find out which
+// tenant a row belongs to. The repository layer (src/models) requires
+// organizationId on every read/write for exactly this reason.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  DISABLED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ORG_ADMIN
+}
+
+enum SyncStatus {
+  // Parked: the organization has not connected Zoho yet, so there is
+  // nothing to deliver to. Costs no retry attempts. Released to PENDING by
+  // syncService.releaseWaiting() when the OAuth connection completes.
+  WAITING_CONNECTION
+  PENDING
+  // Claimed by a worker and being written to Creator right now. Prevents a
+  // second worker (or an overlapping tick) picking up the same row.
+  IN_FLIGHT
+  SUCCESS
+  FAILED
+  DEAD
+}
+
+enum ZohoConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+// ---------------------------------------------------------------------
+// 1. organizations
+// ---------------------------------------------------------------------
+model Organization {
+  id               String             @id @default(uuid())
+  organizationName String             @map("organization_name")
+  organizationCode String             @unique @map("organization_code")
+  status           OrganizationStatus @default(ACTIVE)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  admins         OrgAdmin[]
+  employees      Employee[]
+  devices        Device[]
+  zohoConnection ZohoConnection?
+  enrollments    AgentEnrollment[]
+  syncLogs       ActivitySyncLog[]
+  deviceTokens    DeviceToken[]
+  auditLogs       AuditLog[]
+  activationCodes ActivationCode[]
+  settings        OrganizationSettings?
+
+  @@map("organizations")
+}
+
+// Supporting table: an Organization is not itself a login principal - an
+// admin belonging to one is. Needed for /api/organizations/register and
+// /api/organizations/login. organizationId is nullable because
+// SUPER_ADMIN accounts are not scoped to any single organization.
+model OrgAdmin {
+  id             String    @id @default(uuid())
+  organizationId String?   @map("organization_id")
+  email          String    @unique
+  passwordHash   String    @map("password_hash")
+  role           AdminRole @default(ORG_ADMIN)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("org_admins")
+}
+
+// ---------------------------------------------------------------------
+// 2. employees
+// ---------------------------------------------------------------------
+model Employee {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  employeeCode   String   @map("employee_code") // the employee_id the Agent is configured with
+  fullName       String   @map("full_name")
+  email          String?
+  department     String?
+  designation    String?
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  devices         Device[]
+  activationCodes ActivationCode[]
+
+  @@unique([organizationId, employeeCode])
+  @@index([organizationId])
+  @@map("employees")
+}
+
+// ---------------------------------------------------------------------
+// 3. devices
+// ---------------------------------------------------------------------
+model Device {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  employeeId     String       @map("employee_id")
+  deviceCode     String       @map("device_code") // the device_id the Agent generates locally
+  hostname       String?
+  os             String?
+  osVersion      String?      @map("os_version")
+  arch           String?
+  agentVersion   String?      @map("agent_version")
+  status         DeviceStatus @default(ONLINE)
+  lastSeen       DateTime?    @map("last_seen")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  tokens       DeviceToken[]
+  syncLogs     ActivitySyncLog[]
+
+  @@unique([organizationId, deviceCode])
+  @@index([organizationId])
+  @@index([employeeId])
+  @@map("devices")
+}
+
+// ---------------------------------------------------------------------
+// 7. api_keys / device_tokens
+//
+// Kept separate from Device (rather than a single token column on Device)
+// so a device can be issued a new token without losing history, and a
+// stolen/rotated token can be individually revoked. Only the SHA-256 hash
+// of the token is ever stored; the raw token is returned to the Agent
+// exactly once, at issuance.
+// ---------------------------------------------------------------------
+model DeviceToken {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  deviceId       String    @map("device_id")
+  tokenHash      String    @unique @map("token_hash")
+  issuedAt       DateTime  @default(now()) @map("issued_at")
+  expiresAt      DateTime? @map("expires_at")
+  revokedAt      DateTime? @map("revoked_at")
+  lastUsedAt     DateTime? @map("last_used_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([deviceId])
+  @@map("device_tokens")
+}
+
+// ---------------------------------------------------------------------
+// 4. zoho_connections
+// ---------------------------------------------------------------------
+model ZohoConnection {
+  id                    String                @id @default(uuid())
+  organizationId        String                @unique @map("organization_id")
+  accountOwnerName      String                @map("account_owner_name") // Zoho Creator "owner" URL segment
+  appLinkName           String                @map("app_link_name")      // Zoho Creator app link name
+  dataCenter            String                @default("in") @map("data_center") // in | com | eu | com.au | jp | ca
+  // Creator app timezone, read from getApplications at connect time. Every
+  // date field written to Creator is derived in this zone, never in the
+  // Bridge server's zone.
+  timeZone              String                @default("Asia/Kolkata") @map("time_zone")
+  encryptedRefreshToken String                @map("encrypted_refresh_token")
+  status                ZohoConnectionStatus  @default(DISCONNECTED)
+  connectedAt           DateTime?             @map("connected_at")
+  lastError             String?               @map("last_error")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("zoho_connections")
+}
+
+// ---------------------------------------------------------------------
+// 5. agent_enrollments
+// ---------------------------------------------------------------------
+model AgentEnrollment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  employeeCode   String   @map("employee_code")
+  deviceCode     String   @map("device_code")
+  status         String   @default("COMPLETED")
+  enrolledAt     DateTime @default(now()) @map("enrolled_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("agent_enrollments")
+}
+
+// ---------------------------------------------------------------------
+// 6. activity_sync_logs
+//
+// One row per Agent event, per organization. eventId is the Agent's own
+// event_id (already a UUID generated client-side for OPEN/CLOSE browser
+// events, session events, etc.) and is the idempotency key: a duplicate
+// submission with the same (organizationId, eventId) updates the existing
+// row instead of creating a second one.
+// ---------------------------------------------------------------------
+model ActivitySyncLog {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  deviceId       String     @map("device_id")
+  eventType      String     @map("event_type")
+  eventId        String     @map("event_id")
+  zohoEndpoint   String     @map("zoho_endpoint")
+  payload        Json
+  status         SyncStatus @default(PENDING)
+  attempts       Int        @default(0)
+  lastError      String?    @map("last_error")
+  nextRetryAt    DateTime?  @map("next_retry_at")
+  zohoRecordId   String?    @map("zoho_record_id")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, eventId])
+  @@index([organizationId, status])
+  @@index([status, nextRetryAt])
+  @@map("activity_sync_logs")
+}
+
+// ---------------------------------------------------------------------
+// 8. audit_logs
+// ---------------------------------------------------------------------
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String?  @map("organization_id")
+  actorType      String   @map("actor_type") // SUPER_ADMIN | ORG_ADMIN | AGENT | SYSTEM
+  actorId        String?  @map("actor_id")
+  action         String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------
+// 9. activation_codes
+//
+// ADDED 06-Sep-2026.
+//
+// There was previously no activation code entity at all. enrollmentService
+// "supported" activation codes by string-parsing whatever the Agent sent,
+// scanning every ACTIVE organization for one whose organizationCode was a
+// prefix, then falling back to matching the remainder against employee
+// codes ACROSS ALL TENANTS and taking the first hit. That meant:
+//
+//   - the code was guessable ("ZOFLOW-8D3790-EMP-001" is not a secret),
+//   - it never expired and could be reused without limit,
+//   - EMP-001 exists in most organizations, so the cross-tenant fallback
+//     could enroll a device into the wrong customer's account.
+//
+// This model replaces all of that with a real one-time credential.
+// ---------------------------------------------------------------------
+enum ActivationStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  REVOKED
+}
+
+model ActivationCode {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  employeeId     String           @map("employee_id")
+  // Only the SHA-256 hash is stored. The plaintext code is shown to the
+  // admin once, at generation, and never persisted or logged.
+  codeHash       String           @unique @map("code_hash")
+  // Non-secret display prefix, e.g. "TF-7K4P" - lets an admin identify a
+  // code in a list without the value being usable.
+  codeHint       String           @map("code_hint")
+  status         ActivationStatus @default(ACTIVE)
+  expiresAt      DateTime         @map("expires_at")
+  usedAt         DateTime?        @map("used_at")
+  usedByDeviceId String?          @map("used_by_device_id")
+  createdBy      String?          @map("created_by")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([employeeId])
+  @@map("activation_codes")
+}
+
+// ---------------------------------------------------------------------
+// 10. organization_settings
+//
+// ADDED 06-Sep-2026.
+//
+// PART 4 requires the Creator "Organization Setup" page to persist real
+// configuration. Nothing in the Bridge or in Creator stored it: the
+// Creator app has a monitoring_settings form, but it is scoped to a single
+// employee via a lookup and holds no organization name, admin email,
+// timezone or working hours. The page could only ever have been UI-only.
+//
+// The timezone here is authoritative for every date the Bridge derives.
+// The Creator app is currently set to America/Los_Angeles while the
+// operator works in Asia/Kolkata, which is why "today" on the dashboard
+// resolved to the previous day.
+// ---------------------------------------------------------------------
+model OrganizationSettings {
+  id                 String   @id @default(uuid())
+  organizationId     String   @unique @map("organization_id")
+  administratorEmail String   @map("administrator_email")
+  timeZone           String   @default("Asia/Kolkata") @map("time_zone")
+  workingHoursStart  String   @default("09:00") @map("working_hours_start")
+  workingHoursEnd    String   @default("18:00") @map("working_hours_end")
+
+  browserTracking    Boolean  @default(true)  @map("browser_tracking")
+  applicationTracking Boolean @default(true)  @map("application_tracking")
+  keyboardMetrics    Boolean  @default(true)  @map("keyboard_metrics")
+  mouseTracking      Boolean  @default(true)  @map("mouse_tracking")
+  screenshotsEnabled Boolean  @default(false) @map("screenshots_enabled")
+  idleDetection      Boolean  @default(true)  @map("idle_detection")
+  idleThresholdSeconds Int    @default(300)   @map("idle_threshold_seconds")
+  screenshotIntervalMs Int    @default(600000) @map("screenshot_interval_ms")
+
+  // Real onboarding state, derived from system facts rather than from the
+  // admin having clicked a button. See PART 25.
+  setupCompletedAt   DateTime? @map("setup_completed_at")
+  onboardingCompleted Boolean  @default(false) @map("onboarding_completed")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_settings")
+}

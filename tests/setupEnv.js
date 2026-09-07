@@ -1,0 +1,10 @@
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = 'test-jwt-secret';
+process.env.ENCRYPTION_KEY = 'b'.repeat(64);
+process.env.ZOHO_CLIENT_ID = 'test-client-id';
+process.env.ZOHO_CLIENT_SECRET = 'test-client-secret';
+process.env.ZOHO_REDIRECT_URI = 'https://api.test.local/api/zoho/callback';
+process.env.API_BASE_URL = 'https://api.test.local';
+process.env.LOG_LEVEL = 'silent';
+process.env.RATE_LIMIT_MAX = '10000'; // tests legitimately create many orgs/devices quickly from one client
+process.env.TRACKFLOW_INTEGRATION_KEY = 'test-integration-key';

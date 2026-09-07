@@ -1,0 +1,45 @@
+{
+  "name": "bridge-backend",
+  "version": "1.0.0",
+  "description": "Multi-tenant bridge between the TrackFlow Electron Agent and each organization's own Zoho Creator account.",
+  "private": true,
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed.js",
+    "contract-test": "node scripts/agent-bridge-contract-test.js",
+    "test": "cross-env NODE_ENV=test jest --runInBand",
+    "test:watch": "cross-env NODE_ENV=test jest --runInBand --watch"
+  },
+  "dependencies": {
+    "@prisma/client": "5.19.1",
+    "axios": "1.7.7",
+    "bcrypt": "5.1.1",
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "express": "4.21.0",
+    "express-rate-limit": "7.4.0",
+    "form-data": "4.0.0",
+    "helmet": "7.1.0",
+    "jsonwebtoken": "9.0.2",
+    "pino": "9.4.0",
+    "pino-http": "10.3.0",
+    "uuid": "10.0.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "cross-env": "7.0.3",
+    "jest": "29.7.0",
+    "nodemon": "3.1.7",
+    "prisma": "5.19.1",
+    "supertest": "7.0.0"
+  }
+}
