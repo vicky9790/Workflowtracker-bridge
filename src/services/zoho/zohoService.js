@@ -209,14 +209,27 @@ class ZohoService {
     });
   }
 
-  /** fileBuffer/fileName for a file-upload field on an existing record. */
-  async uploadFile(formName, recordId, fieldName, fileBuffer, fileName) {
+  /**
+   * Uploads a file to a file-upload field on an existing record.
+   *
+   * Zoho Creator v2.1 file upload endpoint uses the REPORT path, not the
+   * FORM path. Using /form/ returns "Invalid API URL format" (code 1000).
+   * Correct format:
+   *   POST /report/{report_link_name}/{record_ID}/{field_link_name}/upload
+   *
+   * @param {string} reportName  - Creator report link name (e.g. 'screenshot_record_Report')
+   * @param {string} recordId    - Creator record ID
+   * @param {string} fieldName   - Field link name (e.g. 'screenshot_file')
+   * @param {Buffer} fileBuffer  - File bytes
+   * @param {string} fileName    - Original filename
+   */
+  async uploadFile(reportName, recordId, fieldName, fileBuffer, fileName) {
     const { url } = await this._baseUrl();
     return this._withAuth(async (token) => {
       const form = new FormData();
       form.append(fieldName, fileBuffer, fileName);
       const res = await axios.post(
-        `${url}/form/${formName}/${recordId}/${fieldName}/upload`,
+        `${url}/report/${reportName}/${recordId}/${fieldName}/upload`,
         form,
         {
           headers: { Authorization: `Zoho-oauthtoken ${token}`, Accept: 'application/json', ...form.getHeaders() },

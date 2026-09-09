@@ -249,25 +249,22 @@ function mapEvent(eventType, { deviceCode, employeeCode, data = {}, timeZone } =
       const key = data.screenshot_id || data.event_id;
       const isUrl = typeof data.screenshot_file === 'string' && (
         data.screenshot_file.startsWith('http://') ||
-        data.screenshot_file.startsWith('https://') ||
-        data.screenshot_file.startsWith('file://')
+        data.screenshot_file.startsWith('https://')
       );
       return {
         form: 'screenshot_record',
         recordKey: { field: 'screenshot_id', value: key },
-        lookups: { ...lookups, session: data.session_id },
+        lookups: compact({ ...lookups, session: data.session_id || undefined }),
         data: compact({
           screenshot_id: key,
           timestamp: toCreatorDateTime(data.timestamp, tz),
           capture_reason: data.capture_reason,
           privacy_status: coercePicklist('privacy_status', data.privacy_status),
-          screenshot_file: isUrl ? { url: data.screenshot_file } : undefined,
         }),
-        // If not a URL, it is base64 bytes for a file-upload field
-        files: (!isUrl && data.screenshot_file)
+        files: data.screenshot_file
           ? [{
             field: 'screenshot_file',
-            base64: data.screenshot_file,
+            ...(isUrl ? { url: data.screenshot_file } : { base64: data.screenshot_file }),
             fileName: data.screenshot_filename || `${key}.png`,
           }]
           : [],

@@ -61,9 +61,15 @@ async function findRecordId(zoho, organizationId, form, keyField, keyValue) {
 
 /**
  * Resolves the mapper's business codes into Creator record IDs.
- * A lookup that cannot be resolved is a hard, non-retriable failure: it
- * means the employee or device does not exist in Creator yet, and retrying
- * the same payload for eight attempts will never change that.
+ *
+ * Lookup strategy:
+ *   - 'session' missing: skip (the session link is informational, not critical)
+ *   - 'device' missing: retriable — the device_register event for this machine
+ *     may be queued ahead of or behind this activity event. The sync worker
+ *     will retry with backoff until the device appears in Creator.
+ *   - 'employee' missing: retriable for the same reason — the employee_profile
+ *     record must be created by the activation flow but may not have synced yet.
+ *   - Any other lookup missing: non-retriable (unexpected schema gap).
  */
 async function resolveLookups(zoho, organizationId, spec) {
   const formSpec = FORMS[spec.form];
@@ -78,11 +84,25 @@ async function resolveLookups(zoho, organizationId, spec) {
     const id = await findRecordId(zoho, organizationId, targetForm, keyField, code);
 
     if (!id) {
+      if (fieldName === 'session') {
+        logger.warn({ organizationId, form: spec.form, session: code }, 'session lookup unresolved in Creator; skipping session association');
+        continue;
+      }
+      // device and employee lookups are retriable: the corresponding
+      // device_register / employee_profile event may still be pending in the
+      // sync queue. Retrying with backoff will succeed once that event lands.
+      const retriable = fieldName === 'device' || fieldName === 'employee';
       const err = new Error(
         `Cannot resolve ${spec.form}.${fieldName}: no ${targetForm} record with ${keyField}="${code}"`
       );
       err.code = 'CREATOR_LOOKUP_UNRESOLVED';
-      err.retriable = false;
+      err.retriable = retriable;
+      if (retriable) {
+        logger.warn(
+          { organizationId, form: spec.form, fieldName, code },
+          'lookup unresolved; will retry — waiting for device/employee to sync to Creator'
+        );
+      }
       throw err;
     }
     // Zoho Creator in this app configures lookup fields (employee, device, session)
@@ -135,8 +155,20 @@ async function writeEvent(organizationId, spec) {
   if (recordId && Array.isArray(spec.files) && spec.files.length > 0) {
     for (const f of spec.files) {
       try {
-        const buf = Buffer.from(f.base64, 'base64');
-        await zoho.uploadFile(spec.form, recordId, f.field, buf, f.fileName);
+        let buf = null;
+        if (f.url) {
+          const axios = require('axios');
+          const resp = await axios.get(f.url, { responseType: 'arraybuffer', timeout: 30000 });
+          buf = Buffer.from(resp.data);
+        } else if (f.base64) {
+          const cleanBase64 = String(f.base64).replace(/^data:image\/[a-z]+;base64,/, '');
+          buf = Buffer.from(cleanBase64, 'base64');
+        }
+        if (buf) {
+          // Upload requires the REPORT path not the FORM path (Zoho Creator v2.1)
+          const reportName = REPORTS[spec.form] || spec.form;
+          await zoho.uploadFile(reportName, recordId, f.field, buf, f.fileName);
+        }
       } catch (err) {
         logger.warn(
           { organizationId, form: spec.form, recordId, field: f.field, err: err.message },

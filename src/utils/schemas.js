@@ -138,7 +138,7 @@ const activity = {
   screenshot: z.object({
     timestamp: z.string().optional(),
     screenshot_file: z.string().min(1),
-    session_id: z.string().optional(),
+    session_id: z.string().nullable().optional(),
     capture_reason: z.string().optional(),
     privacy_status: z.string().optional(),
     event_id: eventIdRequired,
