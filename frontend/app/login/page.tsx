@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Shield, AlertCircle } from 'lucide-react';
+import { WorkSightLogo } from '@/components/layout/WorkSightLogo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -47,12 +48,10 @@ export default function LoginPage() {
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 backdrop-blur-xl p-8 shadow-2xl">
           {/* Header */}
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 shadow-lg shadow-indigo-500/25 text-white font-bold text-lg mb-4 ring-4 ring-indigo-600/20">
-              TF
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-white">TrackFlow Bridge Console</h1>
+            <WorkSightLogo variant="full" className="mb-4" />
+            <h1 className="text-xl font-bold tracking-tight text-white">WorkSight Bridge Console</h1>
             <p className="text-xs text-zinc-400 mt-1.5">
-              Internal Platform Administration & Operations
+              Internal Platform Administration &amp; Operations
             </p>
           </div>
 

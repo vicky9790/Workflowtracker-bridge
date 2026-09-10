@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Route protection
   useEffect(() => {
-    if (!isLoading && !token && pathname !== '/login') {
+    if (!isLoading && !token && pathname !== '/login' && !pathname?.startsWith('/download')) {
       router.push('/login');
     }
   }, [isLoading, token, pathname, router]);

@@ -7,3 +7,6 @@ coverage/
 .DS_Store
 dist/
 build/
+public/downloads/
+*.dmg
+*.exe

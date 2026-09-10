@@ -82,9 +82,26 @@ function createApp() {
 
   // ─── Static installer downloads ────────────────────────────────────────────
   // Files in public/downloads/ are served at /downloads/<filename>.
-  // Clean short URLs:
-  //   /downloads/WorkSight-Agent-Setup.exe   → Windows installer
-  //   /downloads/WorkSight-Agent.dmg         → macOS installer
+  // Redirects to official GitHub Releases CDN when files aren't stored locally.
+  const WIN_RELEASE_URL = 'https://github.com/vicky9790/Workflowtracker-Agent/releases/download/v1.0.0/WorkSight-Agent-Setup-1.0.0.exe';
+  const MAC_RELEASE_URL = 'https://github.com/vicky9790/Workflowtracker-Agent/releases/download/v1.0.0/WorkSight-Agent-1.0.0.dmg';
+
+  app.get('/downloads/WorkSight-Agent-Setup.exe', (req, res, next) => {
+    const localPath = path.join(__dirname, '../public/downloads/WorkSight-Agent-Setup.exe');
+    if (require('fs').existsSync(localPath)) {
+      return res.download(localPath);
+    }
+    return res.redirect(WIN_RELEASE_URL);
+  });
+
+  app.get('/downloads/WorkSight-Agent.dmg', (req, res, next) => {
+    const localPath = path.join(__dirname, '../public/downloads/WorkSight-Agent.dmg');
+    if (require('fs').existsSync(localPath)) {
+      return res.download(localPath);
+    }
+    return res.redirect(MAC_RELEASE_URL);
+  });
+
   app.use('/downloads', express.static(path.join(__dirname, '../public/downloads'), {
     setHeaders(res, filePath) {
       res.setHeader('Content-Disposition', 'attachment; filename="' + path.basename(filePath) + '"');

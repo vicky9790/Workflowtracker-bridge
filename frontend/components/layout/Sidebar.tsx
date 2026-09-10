@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { WorkSightLogo } from './WorkSightLogo';
 import {
   LayoutDashboard,
   Building2,
@@ -19,6 +20,7 @@ import {
   X,
   LogOut,
   Shield,
+  Download,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -37,6 +39,7 @@ const NAV_ITEMS = [
   { href: '/system-health', label: 'System Health', icon: Server },
   { href: '/audit-logs', label: 'Audit Logs', icon: History },
   { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/download', label: 'Download Agent', icon: Download },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
@@ -67,18 +70,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between px-5 border-b border-zinc-800/80">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-md shadow-indigo-500/20 text-white font-bold text-sm tracking-wider">
-              TF
-            </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-sm tracking-tight text-white">
-                TrackFlow
-              </span>
-              <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase">
-                Bridge Console
-              </span>
-            </div>
+          <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+            <WorkSightLogo variant="sidebar" />
           </Link>
           <button
             onClick={onClose}
