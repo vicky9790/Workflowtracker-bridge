@@ -222,6 +222,42 @@ export default function DownloadPage() {
 
         </div>
 
+        {/* Monitoring Terms & Telemetry Disclosure Box */}
+        <div className="mt-10 w-full max-w-4xl rounded-2xl border border-blue-900/40 bg-gradient-to-br from-blue-950/30 to-zinc-900/60 p-6 sm:p-7 backdrop-blur-sm">
+          <div className="flex items-start gap-4">
+            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex-none mt-0.5">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-base font-semibold text-white">Workforce Monitoring & Privacy Consent Notice</h4>
+              <p className="mt-1.5 text-sm text-zinc-300 leading-relaxed">
+                WorkSight is designed to collect workplace activity metrics for your organization during active working sessions. Monitored telemetry includes:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3 text-xs text-zinc-400">
+                <div className="flex items-center gap-2 bg-zinc-900/60 px-3 py-2 rounded-lg border border-zinc-800/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                  <span><strong>Browser Activity:</strong> Visited URLs &amp; tab titles</span>
+                </div>
+                <div className="flex items-center gap-2 bg-zinc-900/60 px-3 py-2 rounded-lg border border-zinc-800/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                  <span><strong>Input Telemetry:</strong> Mouse time, clicks &amp; keystroke counts (no keylogging)</span>
+                </div>
+                <div className="flex items-center gap-2 bg-zinc-900/60 px-3 py-2 rounded-lg border border-zinc-800/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                  <span><strong>Periodic Screenshots:</strong> Configured workstation captures</span>
+                </div>
+                <div className="flex items-center gap-2 bg-zinc-900/60 px-3 py-2 rounded-lg border border-zinc-800/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span><strong>App Telemetry:</strong> Active software &amp; session hours</span>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-zinc-400 leading-relaxed">
+                <em>Upon initial launch, users must review and acknowledge these monitoring terms before proceeding to device activation.</em>
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Enrollment Instructions Box */}
         <div className="mt-10 w-full max-w-4xl rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-7 backdrop-blur-sm">
           <div className="flex items-start gap-4">

@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'TrackFlow Bridge Console',
-  description: 'Internal Platform Admin Console for TrackFlow Bridge',
+  title: 'WorkSight Bridge Console',
+  description: 'Internal Platform Admin Console for WorkSight Bridge',
 };
 
 export default function RootLayout({

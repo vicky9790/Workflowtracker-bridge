@@ -70,7 +70,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between px-5 border-b border-zinc-800/80">
-          <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+          <Link href="/dashboard" className="flex items-center">
             <WorkSightLogo variant="sidebar" />
           </Link>
           <button
