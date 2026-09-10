@@ -74,7 +74,7 @@ const env = {
   SUPER_ADMIN_EMAIL: str('SUPER_ADMIN_EMAIL'),
   SUPER_ADMIN_PASSWORD: str('SUPER_ADMIN_PASSWORD'),
 
-  TRACKFLOW_INTEGRATION_KEY: str('TRACKFLOW_INTEGRATION_KEY', 'trackflow-creator-integration-key'),
+  TRACKFLOW_INTEGRATION_KEY: str('TRACKFLOW_INTEGRATION_KEY', 'trackflow-creator-integration-key-2026'),
 };
 
 /**
