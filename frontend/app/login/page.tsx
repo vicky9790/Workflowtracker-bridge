@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Shield, AlertCircle, Sparkles } from 'lucide-react';
+import { Shield, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -35,11 +35,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillDefaultCredentials = () => {
-    setEmail('super@example.com');
-    setPassword('SuperAdmin@123');
-    setError(null);
-  };
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 bg-zinc-950 relative overflow-hidden">
@@ -100,26 +95,6 @@ export default function LoginPage() {
               Sign In to Console
             </Button>
           </form>
-
-          {/* Quick seed credentials helper */}
-          <div className="mt-6 pt-5 border-t border-zinc-800/80">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Default Super Admin</span>
-              </div>
-              <button
-                type="button"
-                onClick={fillDefaultCredentials}
-                className="text-xs font-mono text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer"
-              >
-                Auto-fill
-              </button>
-            </div>
-            <p className="text-[11px] font-mono text-zinc-500 mt-1">
-              super@example.com / SuperAdmin@123
-            </p>
-          </div>
         </div>
 
         {/* Security footer */}
