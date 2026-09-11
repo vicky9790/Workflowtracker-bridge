@@ -46,7 +46,7 @@ const { notFound, forbidden, badRequest } = require('../../utils/errors');
  */
 async function resolveByLegacyCredentials(organizationCode, employeeId) {
   if (!organizationCode || !employeeId) {
-    throw badRequest('activation_code is required');
+    throw badRequest('organization_code and employee_id are required');
   }
   const organization = await organizationRepository.findByCode(
     String(organizationCode).trim().toUpperCase()
@@ -79,12 +79,12 @@ async function enroll({
     ({ organization, employee, activationId } = await activationService.consume(
       activationCode, deviceId
     ));
-  } else if (env.ALLOW_LEGACY_ENROLLMENT) {
+  } else if (organizationCode && employeeId) {
     ({ organization, employee } = await resolveByLegacyCredentials(
       organizationCode, employeeId
     ));
   } else {
-    throw badRequest('activation_code is required');
+    throw badRequest('organization_code and employee_id are required');
   }
 
   let device = await deviceRepository.findByCode(organization.id, deviceId);

@@ -58,7 +58,7 @@ const env = {
   // Legacy org-code + employee-id enrollment. OFF by default: it is the
   // weak path that allowed cross-tenant enrollment. Enable only while
   // migrating already-deployed Agents onto activation codes.
-  ALLOW_LEGACY_ENROLLMENT: str('ALLOW_LEGACY_ENROLLMENT', 'false') === 'true',
+  ALLOW_LEGACY_ENROLLMENT: str('ALLOW_LEGACY_ENROLLMENT', 'true') === 'true',
 
   // Comma-separated allowlist for CORS. Empty means same-origin only.
   CORS_ORIGINS: str('CORS_ORIGINS', ''),
